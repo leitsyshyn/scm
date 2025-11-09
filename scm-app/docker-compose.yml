@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: scm_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: scm
+      POSTGRES_PASSWORD: scmPW
+      POSTGRES_DB: scm_dev
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scm -d scm_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - scm_network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  scm_network:
+    driver: bridge
