@@ -1,0 +1,5 @@
+{
+  "of:order_status:{orderId}": "string (order status, e.g. 'SHIPPED')",
+  "of:orders_by_customer:{customerId}": "integer (counter)",
+  "of:qty_by_customer:{customerId}": "float (counter)"
+}

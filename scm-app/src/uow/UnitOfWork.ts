@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect";
-import { Sql } from "../db/SqlClient.js";
+import { Sql } from "../db/PgClient.js";
 
 export interface UnitOfWork {
   readonly withTransaction: <A, E, R>(

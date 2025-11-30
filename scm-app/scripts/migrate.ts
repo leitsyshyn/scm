@@ -3,7 +3,7 @@ import { NodeRuntime } from "@effect/platform-node";
 import { Console, Effect } from "effect";
 import { PgMigrator } from "@effect/sql-pg";
 import { fileURLToPath } from "node:url";
-import { DbLive } from "../src/db/SqlClient.js";
+import { DbLive } from "../src/db/PgClient.js";
 import { NodeContext } from "@effect/platform-node";
 
 config();

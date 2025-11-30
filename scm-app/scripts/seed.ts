@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 import { Effect, Console } from "effect";
-import { DbLive, Sql } from "../src/db/SqlClient.js";
+import { DbLive, Sql } from "../src/db/PgClient.js";
 import { SEED_IDS } from "../src/testIds.js";
 
 config();

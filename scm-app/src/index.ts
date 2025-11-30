@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 import { Effect, Layer, Console } from "effect";
-import { DbLive } from "./db/SqlClient.js";
+import { DbLive } from "./db/PgClient.js";
 import { UnitOfWorkLive } from "./uow/UnitOfWork.js";
 import { SalesOrderRepoLive } from "./repositories/SalesOrderRepo.js";
 import { ReservationRepoLive } from "./repositories/ReservationRepo.js";
@@ -8,19 +8,33 @@ import { PickingRepoLive } from "./repositories/PickingRepo.js";
 import { ShipmentRepoLive } from "./repositories/ShipmentRepo.js";
 import { fulfillOrder, type FulfillOrderInput } from "./app/FulfillOrderUseCase.js";
 import { SEED_IDS } from "./testIds.js";
+import { MongoDbLive } from "./db/MongoClient.js";
+import { OrderFulfillmentRepoLive } from "./repositories/OrderFulfillmenRepo.js";
+import { projectOrderToMongoFromView } from "./utils/mappers.js";
+import { benchmarkOrderRead } from "./benchmarks/order-fulfillment-read.js";
+import { OrderMetricsRepo, OrderMetricsRepoLive } from "./repositories/OrderMetricRepo.js";
+import { RedisLive } from "./db/RedisClient.js";
 
 config();
 
-const AppLive = Layer.provide(
-  Layer.mergeAll(
-    UnitOfWorkLive,
-    SalesOrderRepoLive,
-    ReservationRepoLive,
-    PickingRepoLive,
-    ShipmentRepoLive
+const AppLive = Layer.mergeAll(
+  Layer.provide(
+    Layer.mergeAll(
+      UnitOfWorkLive,
+      SalesOrderRepoLive,
+      ReservationRepoLive,
+      PickingRepoLive,
+      ShipmentRepoLive
+    ),
+    DbLive
   ),
-  DbLive
+  Layer.provide(
+    OrderFulfillmentRepoLive,
+    Layer.mergeAll(DbLive, MongoDbLive)
+  ),
+  Layer.provide(OrderMetricsRepoLive, RedisLive)
 );
+
 const program = Effect.gen(function* () {
   yield* Console.log("Starting order fulfillment demo...");
   yield* Console.log("Using seeded test data (run `bun run scripts/seed.ts` if not already done)");
@@ -58,18 +72,37 @@ const program = Effect.gen(function* () {
   yield* Console.log("Picklist ID:", result.picklistId);
   yield* Console.log("Shipment ID:", result.shipmentId);
 
+    const metricsRepo = yield* OrderMetricsRepo;
+  const totalQty = input.lines.reduce(
+    (acc, line) => acc + line.qtyOrdered,
+    0
+  );
+
+  yield* metricsRepo.recordFulfilledOrder({
+    orderId: result.salesOrderId,
+    customerId: input.customerId,
+    totalQty,
+  });
+
+  const metrics = yield* metricsRepo.getCustomerMetrics(input.customerId);
+  yield* Console.log("Redis metrics:", metrics);
+
+  yield* projectOrderToMongoFromView({ input, result });
+
+  yield* benchmarkOrderRead(result.salesOrderId, 10_000);
+
   return result;
 });
 
 const main = program.pipe(
-  Effect.provide(AppLive),
   Effect.catchAll((error) =>
     Effect.gen(function* () {
       yield* Console.error("Error during order fulfillment:");
       yield* Console.error(error);
-      return Effect.fail(error);
+      yield* Effect.fail(error);
     })
-  )
+  ),
+  Effect.provide(AppLive)
 );
 
 Effect.runPromise(main)

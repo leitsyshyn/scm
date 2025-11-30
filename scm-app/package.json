@@ -29,8 +29,8 @@
     "docker:reset": "docker compose down -v && docker compose up -d",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
-    "db:reset": "pnpm docker:reset && sleep 3 && pnpm db:migrate && pnpm db:seed",
-    "db:setup": "pnpm docker:up && sleep 3 && pnpm db:migrate && pnpm db:seed",
+    "db:reset": "bun docker:reset && sleep 3 && bun db:migrate && bun db:seed",
+    "db:setup": "bun docker:up && sleep 3 && bun db:migrate && bun db:seed",
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts"
   },
@@ -40,7 +40,9 @@
     "@effect/sql-pg": "^0.49.2",
     "dotenv": "^17.2.3",
     "effect": "^3.17.7",
+    "mongodb": "^7.0.0",
     "pg": "^8.16.3",
+    "redis": "^5.10.0",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

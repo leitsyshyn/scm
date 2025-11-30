@@ -1,7 +1,7 @@
 
 import { Context, Effect, Layer } from "effect";
 import { v4 as uuidv4 } from "uuid";
-import { Sql, callProcedure, queryView } from "../db/SqlClient.js";
+import { Sql, callProcedure, queryView } from "../db/PgClient.js";
 import type { DomainError } from "../domain/errors.js";
 import type {
   CreateShipmentInput,

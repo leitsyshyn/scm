@@ -378,4 +378,189 @@ SELECT 'lot', l.id, l.lot_code, l.search_tsv
 FROM lot l WHERE l.is_deleted = false
 UNION ALL
 SELECT 'address', a.id, coalesce(a.line1,'') || ' ' || coalesce(a.city,'') || ' ' || coalesce(a.postal_code,''), a.search_tsv
-FROM address a;`);
+FROM address a;
+
+CREATE OR REPLACE VIEW scm.v_order_fulfillment_doc AS
+SELECT
+  so.id AS sales_order_id,
+  so.so_number,
+  so.customer_id,
+  c.name AS customer_name,
+  so.status::text AS so_status,
+  so.order_date,
+  so.due_date,
+  so.currency,
+  COALESCE(res_wh.warehouse_id, ship_info.warehouse_id) AS warehouse_id,
+  COALESCE(res_wh.warehouse_code, ship_info.warehouse_code) AS warehouse_code,
+  ship_info.carrier_id,
+  ship_info.carrier_name,
+  ship_info.tracking_no,
+  ship_info.ship_date,
+  lines_json.lines,
+  reservations_json.reservations,
+  picklist_json.picklist,
+  ship_info.shipment
+FROM scm.sales_order so
+JOIN scm.customer c
+  ON c.id = so.customer_id
+ AND c.is_deleted = false
+LEFT JOIN LATERAL (
+  SELECT
+    jsonb_agg(
+      jsonb_build_object(
+        'lineId', sol.id,
+        'lineNo', sol.line_no,
+        'productId', sol.product_id,
+        'productSku', p.sku,
+        'productName', p.name,
+        'uomId', sol.uom_id,
+        'uomCode', u.code,
+        'qtyOrdered', sol.qty_ordered::double precision,
+        'qtyReservedOpen',
+          GREATEST(
+            COALESCE(r_tot.qty_reserved, 0) - COALESCE(r_tot.qty_picked, 0),
+            0
+          )::double precision,
+        'qtyToReserve',
+          GREATEST(
+            sol.qty_ordered -
+              GREATEST(
+                COALESCE(r_tot.qty_reserved, 0) - COALESCE(r_tot.qty_picked, 0),
+                0
+              ),
+            0
+          )::double precision,
+        'pricePerUom', sol.price_per_uom::double precision
+      )
+    ) AS lines
+  FROM scm.sales_order_line sol
+  JOIN scm.product p
+    ON p.id = sol.product_id
+   AND p.is_deleted = false
+  JOIN scm.unit_of_measure u
+    ON u.id = sol.uom_id
+  LEFT JOIN LATERAL (
+    SELECT
+      SUM(r.qty_reserved) AS qty_reserved,
+      SUM(r.qty_picked) AS qty_picked
+    FROM scm.reservation r
+    WHERE r.so_line_id = sol.id
+      AND r.is_deleted = false
+  ) AS r_tot ON true
+  WHERE sol.sales_order_id = so.id
+    AND sol.is_deleted = false
+) AS lines_json ON true
+LEFT JOIN LATERAL (
+  SELECT
+    jsonb_agg(
+      jsonb_build_object(
+        'id', r.id,
+        'soLineId', r.so_line_id,
+        'warehouseId', r.warehouse_id,
+        'binId', r.bin_id,
+        'productId', r.product_id,
+        'lotId', r.lot_id,
+        'qtyReserved', r.qty_reserved::double precision,
+        'qtyPicked', r.qty_picked::double precision,
+        'status', r.status::text
+      )
+    ) AS reservations
+  FROM scm.reservation r
+  JOIN scm.sales_order_line sol
+    ON sol.id = r.so_line_id
+   AND sol.sales_order_id = so.id
+  WHERE r.is_deleted = false
+) AS reservations_json ON true
+LEFT JOIN LATERAL (
+  SELECT
+    r.warehouse_id,
+    w.code AS warehouse_code
+  FROM scm.reservation r
+  JOIN scm.sales_order_line sol
+    ON sol.id = r.so_line_id
+   AND sol.sales_order_id = so.id
+  JOIN scm.warehouse w
+    ON w.id = r.warehouse_id
+  WHERE r.is_deleted = false
+  ORDER BY r.created_at
+  LIMIT 1
+) AS res_wh ON true
+LEFT JOIN LATERAL (
+  SELECT
+    jsonb_build_object(
+      'picklistId', pl.id,
+      'warehouseId', pl.warehouse_id,
+      'status', pl.status::text,
+      'items',
+        (
+          SELECT jsonb_agg(
+                   jsonb_build_object(
+                     'id', pi.id,
+                     'reservationId', pi.reservation_id,
+                     'binId', pi.bin_id,
+                     'productId', pi.product_id,
+                     'lotId', pi.lot_id,
+                     'qtyToPick', pi.qty_to_pick::double precision,
+                     'qtyPicked', pi.qty_picked::double precision,
+                     'status', pi.status::text
+                   )
+                 )
+          FROM scm.pick_item pi
+          WHERE pi.picklist_id = pl.id
+            AND pi.is_deleted = false
+        )
+    ) AS picklist
+  FROM scm.picklist pl
+  WHERE pl.id = (
+    SELECT pi.picklist_id
+    FROM scm.pick_item pi
+    JOIN scm.reservation r ON r.id = pi.reservation_id
+    JOIN scm.sales_order_line sol ON sol.id = r.so_line_id
+    WHERE sol.sales_order_id = so.id
+    LIMIT 1
+  )
+    AND pl.is_deleted = false
+) AS picklist_json ON true
+LEFT JOIN LATERAL (
+  SELECT
+    s.warehouse_id,
+    w.code AS warehouse_code,
+    s.carrier_id,
+    carr.name AS carrier_name,
+    s.tracking_no,
+    s.ship_date,
+    jsonb_build_object(
+      'shipmentId', s.id,
+      'shipmentNumber', s.shipment_number,
+      'warehouseId', s.warehouse_id,
+      'carrierId', s.carrier_id,
+      'carrierName', carr.name,
+      'trackingNo', s.tracking_no,
+      'shipDate', s.ship_date,
+      'items',
+        (
+          SELECT jsonb_agg(
+                   jsonb_build_object(
+                     'id', si.id,
+                     'productId', si.product_id,
+                     'lotId', si.lot_id,
+                     'qtyShipped', si.qty_shipped::double precision
+                   )
+                 )
+          FROM scm.shipment_item si
+          WHERE si.shipment_id = s.id
+            AND si.is_deleted = false
+        )
+    ) AS shipment
+  FROM scm.shipment s
+  JOIN scm.warehouse w
+    ON w.id = s.warehouse_id
+  LEFT JOIN scm.carrier carr
+    ON carr.id = s.carrier_id
+  WHERE s.sales_order_id = so.id
+    AND s.is_deleted = false
+  ORDER BY s.ship_date DESC, s.id DESC
+  LIMIT 1
+) AS ship_info ON true
+WHERE so.is_deleted = false;
+`);

@@ -5,7 +5,7 @@ import type { SqlError } from "@effect/sql/SqlError";
 import type { ConfigError } from "effect/ConfigError";
 import { Layer } from "effect";
 import { fileURLToPath } from "node:url";
-import { DbLive } from "./SqlClient.js";
+import { DbLive } from "./PgClient.js";
 
 export const MigratorLive: Layer.Layer<
   never,

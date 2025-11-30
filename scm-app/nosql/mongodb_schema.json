@@ -1,0 +1,81 @@
+{
+  "_id": "string (UUID, same as salesOrderId)",
+  "salesOrderId": "string (UUID)",
+  "soNumber": "string | null",
+  "soStatus": "string",
+  "customerId": "string (UUID)",
+  "customerName": "string",
+  "warehouseId": "string (UUID)",
+  "warehouseCode": "string | null",
+  "carrierId": "string | null",
+  "carrierName": "string | null",
+  "trackingNo": "string",
+  "orderDate": "Date",
+  "dueDate": "Date | null",
+  "shipDate": "Date | null",
+  "currency": "string",
+  "lines": [
+    {
+      "lineId": "string (UUID)",
+      "lineNo": "number",
+      "productId": "string (UUID)",
+      "productSku": "string",
+      "productName": "string",
+      "uomId": "string (UUID)",
+      "uomCode": "string",
+      "qtyOrdered": "number",
+      "pricePerUom": "number",
+      "qtyToReserve": "number",
+      "qtyReservedOpen": "number"
+    }
+  ],
+  "reservations": [
+    {
+      "id": "string (UUID)",
+      "soLineId": "string (UUID)",
+      "warehouseId": "string (UUID)",
+      "binId": "string (UUID) | null",
+      "productId": "string (UUID)",
+      "lotId": "string (UUID) | null",
+      "qtyReserved": "number",
+      "qtyPicked": "number",
+      "status": "string"
+    }
+  ],
+  "picklist": {
+    "picklistId": "string (UUID)",
+    "warehouseId": "string (UUID)",
+    "status": "string",
+    "items": [
+      {
+        "id": "string (UUID)",
+        "reservationId": "string (UUID)",
+        "binId": "string (UUID) | null",
+        "productId": "string (UUID)",
+        "lotId": "string (UUID) | null",
+        "qtyToPick": "number",
+        "qtyPicked": "number",
+        "status": "string"
+      }
+    ]
+  },
+  "shipment": {
+    "shipmentId": "string (UUID)",
+    "shipmentNumber": "string | null",
+    "warehouseId": "string (UUID)",
+    "carrierId": "string (UUID) | null",
+    "carrierName": "string | null",
+    "trackingNo": "string",
+    "shipDate": "Date | null",
+    "items": [
+      {
+        "id": "string (UUID)",
+        "productId": "string (UUID)",
+        "lotId": "string (UUID) | null",
+        "qtyShipped": "number"
+      }
+    ]
+  },
+  "createdAt": "Date",
+  "source": "string"
+}

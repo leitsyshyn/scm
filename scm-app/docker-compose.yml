@@ -20,8 +20,35 @@ services:
     networks:
       - scm_network
 
+  mongo:
+    image: mongo:7.0
+    container_name: scm_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - scm_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: scm_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - scm_network
+
 volumes:
   postgres_data:
+    driver: local
+  mongo_data:
+    driver: local
+  redis_data:
     driver: local
 
 networks:
